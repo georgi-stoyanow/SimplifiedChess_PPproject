@@ -1,10 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
-#include <time.h>
 #include <string.h>
 
-/* ---------- data types ---------- */
 typedef enum { KING, ROOK } Piece;
 typedef enum { WHITE, BLACK } Player;
 
@@ -25,7 +23,7 @@ typedef struct {
     char pieceName[8];
 } MoveRecord;
 
-/* ---------- cell management ---------- */
+//Създава полетата
 static Cell *newCell(Piece p, Player pl)
 {
     Cell *c = (Cell*)malloc(sizeof *c);
@@ -35,7 +33,7 @@ static Cell *newCell(Piece p, Player pl)
     return c;
 }
 
-/* ---------- board management ---------- */
+//Управлява дъската
 Board *genBoard(size_t size)
 {
     Board *b = (Board*)malloc(sizeof *b);
@@ -96,20 +94,19 @@ void placeRandom(Board *brd, Piece piece, Player player){
         r = rand() % brd->rows;
         c = rand() % brd->cols;
     } while(brd->field[r][c] != NULL || (piece == KING && isAdjacent(brd, r, c)));
-    
     brd->field[r][c] = newCell(piece, player);
 }
 
 void printBoard(Board *brd)
 {
-    // Print column letters
+    //Принтира буквите на колоните
     printf("  ");
     for(size_t c = 0; c < brd->cols; ++c){
         printf("%c ", 'a' + c);
     }
     printf("\n");
 
-    // Print rows from top (highest number) to bottom (1)
+    //Принтира цифрите отстрани
     for(int r = (int)brd->rows - 1; r >= 0; --r){
         // Print flipped row number
         printf("%d ", (int)brd->rows - r);
@@ -119,7 +116,7 @@ void printBoard(Board *brd)
         printf("%d\n", (int)brd->rows - r);
     }
 
-    // Print column letters again
+    //Принтира буквите от другата страна
     printf("  ");
     for(size_t c = 0; c < brd->cols; ++c){
         printf("%c ", 'a' + c);
@@ -127,49 +124,45 @@ void printBoard(Board *brd)
     printf("\n");
 }
 
-
-/* ---------- validate moves ---------- */
+//Валидира ходовете
 int isValidMove(Board *brd, int r1, int c1, int r2, int c2){
-    if(r1 == r2 && c1 == c2) return 0; // няма движение
+    if(r1 == r2 && c1 == c2) return 0; //Няма движение
 
     Cell *src = brd->field[r1][c1];
     if(!src) return 0;
-
     int dr = r2 - r1;
     int dc = c2 - c1;
 
     switch(src->piece){
         case KING:
-            // Царят може да мърда само с 1 квадрат във всички посоки
+            //Царят може да мърда само с 1 квадрат във всички посоки
             if(abs(dr) <= 1 && abs(dc) <= 1) return 1;
             return 0;
-
         case ROOK:
             // Топът може да мърда само по ред или колона
             if(dr != 0 && dc != 0) return 0; // няма диагонално
 
-            // Проверяваме дали пътят е свободен
-            if(dr == 0){ // движение по ред
+            //Проверява дали пътят е свободен
+            if(dr == 0){ //Движение по ред
                 int step = (dc > 0) ? 1 : -1;
                 for(int c = c1 + step; c != c2; c += step){
                     if(brd->field[r1][c] != NULL) return 0;
                 }
-            } else { // движение по колона
+            } else { //Движение по колона
                 int step = (dr > 0) ? 1 : -1;
                 for(int r = r1 + step; r != r2; r += step){
                     if(brd->field[r][c1] != NULL) return 0;
                 }
             }
             return 1;
-
         default:
             return 0;
     }
 }
 
-/* ---------- helper: check if cell under attack ---------- */
+//Проверява дали полето е под атака
 int isUnderAttack(Board *brd, int r, int c){
-    // Check rooks
+    //Проверява дали топовете атакуват царя
     for(size_t i = 0; i < brd->rows; ++i){
         for(size_t j = 0; j < brd->cols; ++j){
             Cell *cell = brd->field[i][j];
@@ -200,30 +193,19 @@ int isUnderAttack(Board *brd, int r, int c){
     }
     return 0;
 }
-/* ---------- helper: save replay ---------- */
+//Запазва реплея
 void replayGame(const char* filename){
     FILE *f = fopen(filename, "r");
     if(!f){ perror("fopen"); return; }
     char piece[16], from[8], to[8];
     int count = 1;
-    while(fscanf(f, "%15s %7s %7s", piece, from, to) == 3){
+    while(fscanf(f, "%15s %10s %10s", piece, from, to) == 3){
         printf("%2d. %s %s -> %s\n", count++, piece, from, to);
     }
     fclose(f);
 }
 
-/* ---------- helper: replay boards ---------- */
-void replayBoards(const char* filename) {
-    FILE *f = fopen(filename, "r");
-    if(!f){ perror("fopen"); return; }
-    char line[256];
-    while(fgets(line, sizeof(line), f)) {
-        printf("%s", line);
-    }
-    fclose(f);
-}
-
-/* ---------- helper: print stats ---------- */
+//Принтира статистиката след края на играта
 void printStats(MoveRecord moves[], int moveCount, int kingMoves, int rookMoves, int checks){
     printf("\n--- Game Over ---\n");
     printf("Total moves: %d\n", moveCount);
@@ -236,10 +218,10 @@ void printStats(MoveRecord moves[], int moveCount, int kingMoves, int rookMoves,
     }
 }
 
-/* ---------- minimax for black king ---------- */
+//minmax
 void minimaxMoveForBlackKing(Board *brd, MoveRecord moves[], int moveCount, int kingMoves, int rookMoves, int checks, FILE *replayFile, int *blackKingMoves)
 {
-    // Find Black King
+    //Намира черния цар
     int rBK = -1, cBK = -1;
     for(size_t i = 0; i < brd->rows; ++i){
         for(size_t j = 0; j < brd->cols; ++j){
@@ -253,9 +235,7 @@ void minimaxMoveForBlackKing(Board *brd, MoveRecord moves[], int moveCount, int 
         if(rBK != -1) break;
     }
 
-    
-
-    // Directions for King movement
+    //Посоки на движение на черния цар
     int dr[9] = {0, -1, -1, -1, 0, 1, 1, 1, 0};
     int dc[9] = {0, -1, 0, 1, 1, 1, 0, -1, -1};
 
@@ -270,7 +250,7 @@ void minimaxMoveForBlackKing(Board *brd, MoveRecord moves[], int moveCount, int 
         if(nr < 0 || nr >= (int)brd->rows || nc < 0 || nc >= (int)brd->cols) continue;
         if(brd->field[nr][nc] != NULL) continue;
 
-        // Temporarily move the king to check if the new position is safe
+        //Временно премества царя на нова позиция за да провери дали е безопасна
         Cell* king = brd->field[rBK][cBK];
         brd->field[rBK][cBK] = NULL;
         brd->field[nr][nc] = king;
@@ -294,15 +274,15 @@ void minimaxMoveForBlackKing(Board *brd, MoveRecord moves[], int moveCount, int 
             }
         }
 
-        // Undo the temporary move
-        brd->field[nr][nc] = NULL;
-        brd->field[rBK][cBK] = king;
+        //Oтменя временното преместване
+        brd->field[nr][nc]=NULL;
+        brd->field[rBK][cBK]=king;
     }
 
     if(!canMove){
         printf("Black King cannot make a safe move!\n");
         printf("\nCheckmate! White wins!\n");
-        printStats(moves, moveCount, kingMoves, rookMoves, checks);
+        printStats(moves,moveCount,kingMoves,rookMoves,checks);
         replayGame("game_replay.txt");
         freeBoard(brd);
         exit(1);       
@@ -312,7 +292,7 @@ void minimaxMoveForBlackKing(Board *brd, MoveRecord moves[], int moveCount, int 
     brd->field[bestR][bestC] = brd->field[rBK][cBK];
     brd->field[rBK][cBK] = NULL;
 
-    // Write black king move to file and increment counter
+    //Записва хода на черния цар във файл и увеличава брояча
     if(replayFile) {
         char fromSquare[4], toSquare[4];
         sprintf(fromSquare, "%c%d", 'a' + cBK, (int)brd->rows - rBK);
@@ -322,9 +302,9 @@ void minimaxMoveForBlackKing(Board *brd, MoveRecord moves[], int moveCount, int 
     if(blackKingMoves) (*blackKingMoves)++;
 }
 
-/* ---------- checkmate detection ---------- */
+//Засича дали черния е в мат
 int isCheckmate(Board *brd){
-    // Find Black King
+    //Намери черния цар
     int rBK = -1, cBK = -1;
     for(size_t i = 0; i < brd->rows; ++i){
         for(size_t j = 0; j < brd->cols; ++j){
@@ -338,10 +318,10 @@ int isCheckmate(Board *brd){
         if(rBK != -1) break;
     }
 
-    // If king is not under attack, it's not checkmate
+    //Ако царя не е под атака не е в мат
     if(!isUnderAttack(brd, rBK, cBK)) return 0;
 
-    // Check all possible moves for the king
+    //Провери дали царя има възможни ходове
     int dr[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
     int dc[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 
@@ -351,32 +331,19 @@ int isCheckmate(Board *brd){
 
         if(nr < 0 || nr >= (int)brd->rows || nc < 0 || nc >= (int)brd->cols) continue;
         if(brd->field[nr][nc] != NULL) continue;
-        if(!isUnderAttack(brd, nr, nc)) return 0; // Found a safe square
+        if(!isUnderAttack(brd, nr, nc)) return 0;//Намира безопасен ход
     }
 
-    return 1; // No safe moves found
+    return 1;//Няма намерени безопасни хододве
 }
 
-/* ---------- helper: piece name ---------- */
+//Помощник за имената на фигурите
 const char* pieceName(Piece p){
     switch(p){
         case KING: return "King";
         case ROOK: return "Rook";
         default: return "?";
     }
-}
-
-int showMenu(){
-    int choice;
-    printf("\n--- Шах Меню ---\n");
-    printf("1. Старт\n");
-    printf("2. Промяна на размера на полето\n");
-    printf("3. Реплей\n");
-    printf("4. Изход\n");
-    printf("Избор: ");
-    scanf("%d", &choice);
-    getchar(); // прочитане на новия ред
-    return choice;
 }
 
 int parseInput(const char* input, int* row, int* col, int boardSize) {
@@ -404,16 +371,13 @@ int parseInput(const char* input, int* row, int* col, int boardSize) {
     return 1;
 }
 
-
-
-
-/* ---------- main logic ---------- */
+//Главна логика
 int main() {
     Board *brd = NULL;
     MoveRecord moves[100];
     int moveCount = 0, kingMoves = 0, rookMoves = 0, checks = 0;
 
-    size_t boardSize = 8; // по подразбиране 8x8
+    size_t boardSize = 8;
 
     while(1) {
         printf("\nМеню:\n");
@@ -426,10 +390,10 @@ int main() {
         int choice;
         if(scanf("%d", &choice) != 1) {
             printf("Невалиден избор\n");
-            while(getchar() != '\n'); // изчистване на входния буфер
+            while(getchar() != '\n'); //Изчистване на входния буфер
             continue;
         }
-        while(getchar() != '\n'); // изчистване на буфера след scanf
+        while(getchar() != '\n'); //Изчистване на буфера след scanf
 
         if(choice == 1 || choice == 2) {
             if(choice == 2) {
@@ -445,22 +409,19 @@ int main() {
                 }
             }
 
-            // Стартиране на игра с текущия boardSize
+            //Стартиране на игра с текущия boardSize
             if(brd) freeBoard(brd);
-
             brd = genBoard(boardSize);
-
             moveCount = 0;
             kingMoves = 0;
             rookMoves = 0;
             checks = 0;
-
             placeRandom(brd, KING,  WHITE);
             placeRandom(brd, ROOK,  WHITE);
             placeRandom(brd, ROOK,  WHITE);
             placeRandom(brd, KING,  BLACK);
 
-            // Open file for writing moves
+            //Отваря файл за записване на раплей
             FILE *replayFile = fopen("game_replay.txt", "w");
             if(!replayFile) {
                 perror("Не може да се отвори файл за запис на реплей!");
@@ -504,19 +465,19 @@ int main() {
                 brd->field[r2][c2] = brd->field[r1][c1];
                 brd->field[r1][c1] = NULL;
 
-                // Запис на хода
+                //Записва хода
                 MoveRecord *mr = &moves[moveCount++];
                 strcpy(mr->from, from);
                 strcpy(mr->to, to);
                 strcpy(mr->pieceName, pieceName(src->piece));
 
-                // Write move to file
+                //Записва ходовете във файла
                 fprintf(replayFile, "%s %s %s\n", mr->pieceName, mr->from, mr->to);
 
                 if(src->piece == KING) kingMoves++;
                 else if(src->piece == ROOK) rookMoves++;
 
-                // Check if black king is in check after white's move
+                //Проверява дали черния цар е под атака след ход на белия
                 int rBK = -1, cBK = -1;
                 for(size_t i = 0; i < brd->rows; ++i){
                     for(size_t j = 0; j < brd->cols; ++j){
@@ -538,29 +499,20 @@ int main() {
 
                 if(isCheckmate(brd)){
                     printf("Мат! Бялата страна печели!\n");
+                    printStats(moves, moveCount, kingMoves, rookMoves, checks);
                     fclose(replayFile);
                     freeBoard(brd);
                     brd = NULL;
                     break;
                 }
 
-                    static int blackKingMoves = 0; // Declare once at the top of main or before the game loop
-
-                    // In the game loop:
+                    static int blackKingMoves = 0;
                     minimaxMoveForBlackKing(brd, moves, moveCount, kingMoves, rookMoves, checks, replayFile, &blackKingMoves);
                     printBoard(brd);
 
-                    if(isCheckmate(brd)){
-                        printf("Мат! Бялата страна печели!\n");
-                        fclose(replayFile);
-                        freeBoard(brd);
-                        brd = NULL;
-                        break;
-                    }
             }
-            fclose(replayFile); // Also close if the loop ends unexpectedly
+            fclose(replayFile);//Затваря и ако има break или нещо се случи
         } else if(choice == 3) {
-            replayBoards("game_replay.txt");
             replayGame("game_replay.txt");
         } else if(choice == 4) {
             printf("Изход от програмата.\n");
@@ -576,14 +528,14 @@ int main() {
 
 void fprintBoard(FILE *f, Board *brd)
 {
-    // Print column letters
+    //Принтира буквите на колоните
     fprintf(f, "  ");
     for(size_t c = 0; c < brd->cols; ++c){
         fprintf(f, "%c ", 'a' + c);
     }
     fprintf(f, "\n");
 
-    // Print rows from top (highest number) to bottom (1)
+    //Принтира цифрите отстрани
     for(int r = (int)brd->rows - 1; r >= 0; --r){
         fprintf(f, "%d ", (int)brd->rows - r);
         for(size_t c = 0; c < brd->cols; ++c){
@@ -592,7 +544,7 @@ void fprintBoard(FILE *f, Board *brd)
         fprintf(f, "%d\n", (int)brd->rows - r);
     }
 
-    // Print column letters again
+    // Принтира буквите от другата страна
     fprintf(f, "  ");
     for(size_t c = 0; c < brd->cols; ++c){
         fprintf(f, "%c ", 'a' + c);
